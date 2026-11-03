@@ -1,25 +1,20 @@
-# 复古剪纸实体素材提示词模版
+# 现代写实摄影模切贴纸提示词规范
 
-本模版用于将用户提供的真人剧照、实拍照片或概念主体，转置为带有历史质感的 1950-1970 年代复古生活杂志剪纸素材（纯白背景单体孤立，严禁贴纸白边）。
+本模版用于在全图概念或垫图解构中，将人物或核心生物主体生成为具备**真实摄影微观质感、清爽模切白边与物理投影**的现代贴纸图元（纯白无缝背景独立孤立）。
 
-## 真实纸张与物理剪裁原则
+> [!IMPORTANT]
+> **绝对禁止纯色压平与网点劣化**：严禁将人物使用 K-Means 聚类为纯色矢量色块，严禁打上 1950 年代老报纸半色调网点（Halftone Dots）。必须保持真实高反差摄影质感（Authentic Photographic Texture），包含细腻发丝、眼神光与自然肤质。
 
-发给生图模型的提示词中，**必须前置声明真实印刷与物理剪裁的视觉语言规范**，让扩散模型直接生成具备实体拼贴质感的位图：
-
-1. **复古生活杂志扫描**：声明源自 1950-1970 年代真实出版物印刷质感（1950s-1970s vintage lifestyle magazine scan），带有历史印刷品的轻微褪色与油墨沉淀；
-2. **铜版照相凹版与半色调网点**：注入铜版照相凹版（Photogravure）与木刻丝网网点（Halftone dot pattern）肌理，呈现真实的网点颗粒感，杜绝数码矢量的塑料平滑感；
-3. **剪刀物理顿挫**：要求逼真的剪刀物理裁剪边缘（Authentic scissor cut-out contour），呈现手工剪裁特有的微小顿挫与纸张纤维切口，边缘自然干脆；
-4. **单体纯白孤立**：输出主体必须在纯白平坦背景上孤立呈现（Isolated on pure solid white background），便于后续精准无损抠图；
-5. **严禁贴纸白边与外发光**：彻底禁用模切白边、贴纸边缘与人工光晕（No white outline, no die-cut border, no outer glow, no sticker effect），主体边缘必须紧贴真实轮廓。
+---
 
 ## 提示词配方
 
 ```text
-A vintage cut-out figure from a 1950s-1970s lifestyle magazine scan, photogravure and halftone dot pattern texture, authentic hand-cut scissor contour with subtle edge fiber imperfections, isolated on a seamless pure solid white background. High contrast retro print aesthetic, raw paper cut-out feel, no white borders, no die-cut outlines, no artificial outer glow, no stickers.
+A modern high-contrast photographic cut-out portrait sticker of [主体描述，如：a contemplative young woman with sharp dark bangs and expressive eyes], authentic camera photograph texture, natural studio lighting, crisp skin micro-details, sharp individual hair strands, styled distinctly as a tangible die-cut paper sticker with a continuous 4px solid pure white die-cut border around the entire silhouette and a soft subtle contact drop shadow, isolated on a seamless pure solid white background (#FFFFFF). Contemporary editorial pop art aesthetic, raw photography paper sticker feel, zero halftone dots, zero vintage grain, zero solid vector flattening, no stickers overlapping.
 ```
 
-## 关键机制与合规考量
+## 关键参数与设计考量
 
-- **粉碎数码平庸与复古质感**：现代二次元矢量或平涂贴纸具有强烈的 AI 数码味，而 1950-1970 年代的凹版网点与胶印颗粒赋予拼贴作品真实的物理重量感与艺术典藏价值。
-- **纯净无字红线**：提示词中严禁出现任何添加短句或英文说明的诉求，锁定纯粹的人物或物体主体。
-- **真实边缘紧贴穿插**：剥离人工白边后，主体轮廓可以与背景星空、地质字条或超现实道具产生无缝物理咬合与空间穿插，实现纯正的 Joe Webb / Toon Joosen 拼贴语言。
+- **写实微观摄影质感**：锁定 `authentic camera photograph texture` 与 `natural studio lighting`，避免 AI 假画质或扁平化；
+- **4px 模切白边（Die-cut Border）**：声明 `continuous 4px solid pure white die-cut border around the entire silhouette`，让扩散模型直接生成实体贴纸冲压轮廓；
+- **实图垫图零 AI 指纹替代路线**：当用户提供真人剧照或实拍素材时，跳过扩散模型，直接运行 Python 脚本基于真实 CMOS 像素与形态学膨胀生成纯物理模切贴纸（AI 指纹为 0.00%）。
