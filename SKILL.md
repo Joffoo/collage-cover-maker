@@ -127,14 +127,22 @@ flowchart TD
 用户确认定桩后，流水线进入自动化资产拆解、保真分流与多画幅自适应装配。
 
 #### 步骤 2 散件解构平铺 / 实图代码抠图
-- **若为 AIGC 路线**：以概念图为参考垫图，展开为纯白底平铺散件图（`hero_spritesheet.jpg`）；
-- **若为实图路线**：直接运行代码抠图算法（RMBG-ONNX / BiRefNet / rembg），仅计算透明通道 Alpha 遮罩，100% 保留相机原生 CMOS 像素与光电散粒噪声。
+- **若为 AIGC 路线**：以概念图为参考垫图，展开为纯白底平铺散件图（`hero_spritesheet.jpg`），各个图元之间留足 60~80px 负空间；
+- **若为实图路线**：直接在原图基础上进行精准面部/头部提取，对于被遮挡的下半身，采用 Dymo 胶带截断、异质身体嫁接（Mismatched Collage Body）或丙烯色块厚涂托底阻断。
 
 #### 步骤 3 模切贴纸化与矢量图元提取
-1. **人物模切贴纸化（Die-cut Sticker）**：
-   通过形态学椭圆核膨胀外扩 5px 实体纯白模切边，并附加自然微距柔和投影与发丝边缘 Alpha 平滑混合；
-2. **纯矢量装饰图元（Zero AI Fingerprint）**：
-   丙烯厚涂色块（`brush_smears.svg`）与手绘马克笔涂鸦（`marker_doodles.svg`）统一采用纯 SVG 矢量代码生成，杜绝外部位图依赖。
+1. **自动化散件切块（Auto Spritesheet Splitter）**：
+   运行 `split_spritesheet.py` 自动识别白底负空间连通域，外扩防撞边安全护盾，并以形态学闭运算封死发丝内部孔隙，为每个组件生成 16~18px 实体纯白冲压模切边：
+   ```bash
+   python .agents/skills/collage-cover-maker/scripts/split_spritesheet.py "_inbox/<slug>_assets/hero_spritesheet.jpg" "_inbox/<slug>_assets/sprites"
+   ```
+2. **零 AI 指纹矢量化降阶（Zero AI Fingerprint Vectorizer）**：
+   针对人物主体，运行矢量化工具通过双边滤波与 Lab 空间 K-Means 感知聚类（12~16 阶丝网印刷平色块），将扩散微噪点彻底降阶为标准矢量 SVG 贴纸（`subject_sticker.svg`）：
+   ```bash
+   python .agents/skills/collage-cover-maker/scripts/vectorize_sticker.py "_inbox/<slug>_assets/sprites/subject_sticker.png" "_inbox/<slug>_assets/sprites/subject_sticker.svg"
+   ```
+3. **纯矢量装饰图元（Zero AI Fingerprint）**：
+   丙烯厚涂色块（`brush_smears.svg`）、手绘马克笔涂鸦（`marker_doodles.svg`）与异质道具（`prop_giant.svg`）统一采用纯 SVG 矢量代码生成，杜绝外部位图依赖。
 
 #### 步骤 4 HTML DOM 物理装配
 在 `_inbox/<slug>_assets/` 编写物理穿插 DOM 布局：
