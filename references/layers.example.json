@@ -1,0 +1,18 @@
+{
+  "slug": "示例",
+  "paper": "#F7F5F0",
+  "layers": [
+    { "id": "smear-blue", "kind": "image", "src": "parts/smear_blue.svg", "origin": "gen", "role": "decor", "z": 15,
+      "frames": { "wechat": { "x": 900, "y": 420, "w": 900, "rot": -12 } } },
+    { "id": "doodle-bolt", "kind": "image", "src": "parts/doodle_bolt.svg", "origin": "gen", "role": "decor", "z": 18,
+      "frames": { "wechat": { "x": 760, "y": 200, "w": 160, "rot": 8 } } },
+    { "id": "subject", "kind": "image", "src": "parts/subject.png", "origin": "real", "role": "subject", "z": 22,
+      "frames": { "wechat": { "x": 1057, "y": 430, "w": 560, "rot": 0 } } },
+    { "id": "prop", "kind": "image", "src": "parts/prop.svg", "origin": "gen", "role": "prop", "z": 26,
+      "frames": { "wechat": { "x": 1260, "y": 560, "w": 420, "rot": 15 } } },
+    { "id": "title", "kind": "tape", "text": "主标题4到8字", "bg": "#111111", "fg": "#FFFFFF", "role": "title", "z": 32,
+      "frames": { "wechat": { "x": 1057, "y": 720, "w": 84, "rot": -2.5 } } },
+    { "id": "subtitle", "kind": "tape", "text": "一句话副标题", "bg": "#E52521", "fg": "#FFFFFF", "role": "subtitle", "z": 34,
+      "frames": { "wechat": { "x": 1100, "y": 810, "w": 44, "rot": 1 } } }
+  ]
+}

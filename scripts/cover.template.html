@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>collage cover</title>
+<style>
+  @font-face {
+    font-family: 'SmileySans';
+    src: url('/*SMILEY_FONT*/') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: block;
+  }
+  html, body { margin: 0; height: 100%; background: #2b2b2b; overflow: hidden; font-family: 'SmileySans', system-ui, "Microsoft YaHei", sans-serif; }
+  body.render { background: none; overflow: visible; height: auto; }
+  #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+  #paper { position: absolute; inset: 0; z-index: 0; }
+  #paper::after { content: ""; position: absolute; inset: 0; opacity: .5; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .48  0 0 0 0 .44  0 0 0 .22 0'/></filter><rect width='400' height='400' filter='url(%23n)'/></svg>"); }
+  .layer { position: absolute; transform-origin: 50% 50%; filter: drop-shadow(0 6px 14px rgba(0,0,0,.28)); user-select: none; -webkit-user-drag: none; }
+  .layer.tape { white-space: nowrap; font-weight: normal; line-height: 1.15; padding: .2em .55em; letter-spacing: .06em;
+    box-shadow: 4px 8px 22px rgba(0,0,0,.35); filter: none; font-family: 'SmileySans', "Arial Black", "Microsoft YaHei", sans-serif; }
+  .editing .layer { cursor: move; }
+  .layer.sel { outline: 3px dashed #00b3ff; outline-offset: 4px; }
+  .zone { position: absolute; z-index: 9999; pointer-events: none; }
+  .zone.keep { outline: 3px solid rgba(0,200,120,.9); box-shadow: 0 0 0 9999px rgba(0,0,0,.28); }
+  .zone.avoid { background: rgba(255,0,0,.22); }
+  #panel { position: fixed; right: 0; top: 0; bottom: 0; width: 270px; background: #1c1c1c; color: #eee; padding: 12px; box-sizing: border-box; font-size: 13px; overflow: auto; z-index: 99999; }
+  #panel h4 { margin: 12px 0 6px; font-size: 12px; color: #8cf; }
+  #panel button, #panel input, #panel select { font: inherit; }
+  #panel button { background: #333; color: #eee; border: 1px solid #555; padding: 4px 8px; margin: 2px; cursor: pointer; }
+  #panel button.on { background: #0a6; }
+  #panel label { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; }
+  #panel input[type=number], #panel input[type=text] { width: 120px; background: #111; color: #eee; border: 1px solid #555; padding: 3px; }
+  #layers div { padding: 3px 6px; cursor: pointer; border-bottom: 1px solid #333; }
+  #layers div.sel { background: #0a4a6a; }
+  #msg { color: #fc6; min-height: 1.4em; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="paper"></div></div>
+<script>
+const LAYERS = /*LAYERS*/;
+const FORMATS = /*FORMATS*/;
+const ASSETS = /*ASSETS*/;
+const OUT_NAME = { wechat: "cover_2115x900.png", wide: "cover_1920x1080.png", xhs: "cover_1440x1920.png" };
+const q = new URLSearchParams(location.search);
+const editing = !q.has("render");
+let fmt = q.get("fmt") || "wechat";
+let sel = null;
+const stage = document.getElementById("stage");
+const paper = document.getElementById("paper");
+document.body.classList.add(editing ? "editing" : "render");
+
+function frameOf(l, f) {
+  l.frames = l.frames || {};
+  if (!l.frames[f]) {
+    const F = FORMATS[f];
+    l.frames[f] = l.kind === "tape"
+      ? { x: F.w / 2, y: F.h * 0.8, w: F.h * 0.07, rot: -2.5 }
+      : { x: F.w / 2, y: F.h / 2, w: F.w * 0.3, rot: 0 };
+  }
+  return l.frames[f];
+}
+
+function place(el, l) {
+  const fr = frameOf(l, fmt);
+  el.style.left = fr.x + "px";
+  el.style.top = fr.y + "px";
+  el.style.zIndex = l.z;
+  el.style.transform = "translate(-50%,-50%) rotate(" + (fr.rot || 0) + "deg)";
+  if (l.kind === "tape") el.style.fontSize = fr.w + "px"; else el.style.width = fr.w + "px";
+}
+
+function build() {
+  const F = FORMATS[fmt];
+  stage.style.width = F.w + "px";
+  stage.style.height = F.h + "px";
+  paper.style.background = LAYERS.paper || "#F7F5F0";
+  stage.querySelectorAll(".layer,.zone").forEach(n => n.remove());
+  for (const l of LAYERS.layers) {
+    let el;
+    if (l.kind === "tape") {
+      el = document.createElement("div");
+      el.className = "layer tape";
+      el.textContent = l.text;
+      el.style.background = l.bg || "#111";
+      el.style.color = l.fg || "#fff";
+    } else {
+      el = document.createElement("img");
+      el.className = "layer";
+      el.src = ASSETS[l.src] || l.src;
+      el.draggable = false;
+    }
+    el.dataset.id = l.id;
+    el.dataset.role = l.role || "";
+    place(el, l);
+    if (editing) el.addEventListener("pointerdown", e => startDrag(e, l, el));
+    stage.appendChild(el);
+  }
+  if (editing) { drawZones(); fit(); refresh(); }
+}
+
+function zone(cls, r) {
+  const z = document.createElement("div");
+  z.className = "zone " + cls;
+  z.style.cssText += `left:${r[0]}px;top:${r[1]}px;width:${r[2]}px;height:${r[3]}px`;
+  stage.appendChild(z);
+}
+function drawZones() {
+  if (!document.getElementById("zoneOn")?.classList.contains("on")) return;
+  const F = FORMATS[fmt];
+  if (F.square) zone("keep", F.square);
+  (F.avoid || []).forEach(r => zone("avoid", r));
+}
+
+function fit() {
+  const F = FORMATS[fmt];
+  const s = Math.min((innerWidth - 290) / F.w, (innerHeight - 20) / F.h);
+  stage.style.transform = `translate(10px,10px) scale(${s})`;
+  stage.dataset.scale = s;
+}
+addEventListener("resize", () => editing && fit());
+
+function startDrag(e, l, el) {
+  select(l.id);
+  const fr = frameOf(l, fmt);
+  const s = +stage.dataset.scale;
+  const sx = e.clientX, sy = e.clientY, ox = fr.x, oy = fr.y;
+  const move = ev => { fr.x = Math.round(ox + (ev.clientX - sx) / s); fr.y = Math.round(oy + (ev.clientY - sy) / s); place(el, l); syncInputs(); dirty(); };
+  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
+  addEventListener("pointermove", move);
+  addEventListener("pointerup", up);
+  e.preventDefault();
+}
+
+/* ---------- 编辑面板 ---------- */
+let panel, dirtyFlag = false;
+function dirty() { dirtyFlag = true; msg("未保存（Ctrl+S 保存）"); }
+function msg(t) { const m = document.getElementById("msg"); if (m) m.textContent = t; }
+function cur() { return LAYERS.layers.find(l => l.id === sel); }
+function select(id) { sel = id; refresh(); }
+function refresh() {
+  stage.querySelectorAll(".layer").forEach(n => n.classList.toggle("sel", n.dataset.id === sel));
+  const box = document.getElementById("layers");
+  box.innerHTML = "";
+  [...LAYERS.layers].sort((a, b) => b.z - a.z).forEach(l => {
+    const d = document.createElement("div");
+    d.textContent = `${l.z}  ${l.id}`;
+    d.className = l.id === sel ? "sel" : "";
+    d.onclick = () => select(l.id);
+    box.appendChild(d);
+  });
+  syncInputs();
+}
+function syncInputs() {
+  const l = cur();
+  for (const k of ["x", "y", "w", "rot", "z"]) {
+    const i = document.getElementById("in_" + k);
+    i.disabled = !l;
+    if (l) i.value = k === "z" ? l.z : frameOf(l, fmt)[k];
+  }
+  const t = document.getElementById("in_text");
+  t.disabled = !l || l.kind !== "tape";
+  t.value = l && l.kind === "tape" ? l.text : "";
+}
+function applyInput(k, v) {
+  const l = cur(); if (!l) return;
+  v = parseFloat(v); if (isNaN(v)) return;
+  if (k === "z") l.z = v; else frameOf(l, fmt)[k] = v;
+  const el = stage.querySelector(`[data-id="${l.id}"]`);
+  place(el, l); dirty(); if (k === "z") refresh();
+}
+let noiseTile = null;
+function getNoiseTile() {
+  if (noiseTile) return noiseTile;
+  const c = document.createElement("canvas");
+  c.width = c.height = 240;
+  const x = c.getContext("2d"), id = x.createImageData(240, 240), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = (Math.random() - 0.5) * 18;
+    d[i] = 128 + v; d[i+1] = 124 + v; d[i+2] = 116 + v; d[i+3] = 18;
+  }
+  x.putImageData(id, 0, 0);
+  return (noiseTile = c);
+}
+
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = rej;
+    im.src = ASSETS[src] || src;
+  });
+}
+
+async function renderFormatToCanvas(f) {
+  const F = FORMATS[f];
+  const c = document.createElement("canvas");
+  c.width = F.w; c.height = F.h;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = LAYERS.paper || "#F7F5F0";
+  ctx.fillRect(0, 0, F.w, F.h);
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = ctx.createPattern(getNoiseTile(), "repeat");
+  ctx.fillRect(0, 0, F.w, F.h);
+  ctx.restore();
+
+  const sorted = [...LAYERS.layers].sort((a, b) => a.z - b.z);
+  for (const l of sorted) {
+    const fr = frameOf(l, f);
+    ctx.save();
+    ctx.translate(fr.x, fr.y);
+    ctx.rotate(((fr.rot || 0) * Math.PI) / 180);
+    if (l.kind === "tape") {
+      const fs = fr.w;
+      ctx.font = `900 ${fs}px "Arial Black", "Microsoft YaHei", "PingFang SC", sans-serif`;
+      const m = ctx.measureText(l.text || "");
+      const tw = m.width + (l.text ? l.text.length * fs * 0.04 : 0);
+      const bw = tw + fs * 1.0, bh = fs * 1.15 + fs * 0.36;
+      ctx.shadowColor = "rgba(0,0,0,0.35)";
+      ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 8; ctx.shadowBlur = 22;
+      ctx.fillStyle = l.bg || "#111";
+      ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+      ctx.shadowColor = "transparent";
+      ctx.fillStyle = l.fg || "#fff";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      if ("letterSpacing" in ctx) ctx.letterSpacing = (fs * 0.04) + "px";
+      ctx.fillText(l.text || "", 0, 0);
+    } else {
+      const im = await loadImg(l.src);
+      const w = fr.w, h = w * (im.naturalHeight / im.naturalWidth);
+      ctx.shadowColor = "rgba(0,0,0,0.28)";
+      ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 6; ctx.shadowBlur = 14;
+      ctx.drawImage(im, -w / 2, -h / 2, w, h);
+    }
+    ctx.restore();
+  }
+  return c;
+}
+
+function downloadCanvas(c, name) {
+  return new Promise(res => c.toBlob(b => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = name; a.click();
+    setTimeout(res, 150);
+  }, "image/png"));
+}
+
+async function savePng(all = false) {
+  msg("正在渲染导出 PNG...");
+  const list = all ? Object.keys(FORMATS) : [fmt];
+  for (const f of list) {
+    const c = await renderFormatToCanvas(f);
+    await downloadCanvas(c, OUT_NAME[f]);
+    if (f === "wechat" && FORMATS.wechat.square) {
+      const [sx, sy, sw, sh] = FORMATS.wechat.square;
+      const sq = document.createElement("canvas");
+      sq.width = sw; sq.height = sh;
+      sq.getContext("2d").drawImage(c, Math.round(sx), Math.round(sy), sw, sh, 0, 0, sw, sh);
+      await downloadCanvas(sq, "cover_900x900.png");
+    }
+  }
+  await saveJsonQuiet();
+  msg(all ? "✅ 已导出全部 4 张 PNG + layers.json" : `✅ 已导出 ${OUT_NAME[fmt]}${fmt === "wechat" ? " + 900x900" : ""}`);
+}
+
+async function saveJsonQuiet() {
+  const txt = JSON.stringify(LAYERS, null, 2);
+  try {
+    if (location.protocol.startsWith("http")) {
+      const r = await fetch("/save", { method: "POST", body: txt });
+      if (r.ok) { dirtyFlag = false; return; }
+    }
+  } catch (_) {}
+  try { await navigator.clipboard.writeText(txt); } catch (_) {}
+  dirtyFlag = false;
+}
+
+async function save() {
+  await savePng(false);
+}
+function mountPanel() {
+  panel = document.createElement("div");
+  panel.id = "panel";
+  panel.innerHTML = `
+    <h4>画幅</h4><div id="tabs"></div>
+    <h4>参考线</h4><button id="zoneOn" class="on">安全区</button>
+    <h4>图层（上为前）</h4><div id="layers"></div>
+    <h4>选中图层</h4>
+    <label>x <input id="in_x" type="number"></label>
+    <label>y <input id="in_y" type="number"></label>
+    <label>宽/字号 <input id="in_w" type="number"></label>
+    <label>旋转° <input id="in_rot" type="number" step="0.5"></label>
+    <label>层级 z <input id="in_z" type="number"></label>
+    <label>文字 <input id="in_text" type="text"></label>
+    <h4>操作</h4>
+    <button id="saveBtn" class="on">保存当前 PNG (Ctrl+S)</button>
+    <button id="saveAllBtn">导出全部 4 张 PNG</button>
+    <button id="saveJsonBtn">下载 layers.json</button>
+    <div style="margin-top:8px;color:#999">拖动移位 · 方向键微调 · Shift 加速 · [ ] 旋转 · - = 缩放 · PgUp/PgDn 层级</div>
+    <div id="msg"></div>`;
+  document.body.appendChild(panel);
+  const tabs = panel.querySelector("#tabs");
+  Object.keys(FORMATS).forEach(f => {
+    const b = document.createElement("button");
+    b.textContent = f + " " + FORMATS[f].w + "×" + FORMATS[f].h;
+    b.className = f === fmt ? "on" : "";
+    b.onclick = () => { fmt = f; tabs.querySelectorAll("button").forEach(x => x.classList.remove("on")); b.classList.add("on"); build(); };
+    tabs.appendChild(b);
+  });
+  panel.querySelector("#zoneOn").onclick = e => { e.target.classList.toggle("on"); build(); };
+  for (const k of ["x", "y", "w", "rot", "z"]) panel.querySelector("#in_" + k).oninput = e => applyInput(k, e.target.value);
+  panel.querySelector("#in_text").oninput = e => { const l = cur(); l.text = e.target.value; stage.querySelector(`[data-id="${l.id}"]`).textContent = l.text; dirty(); };
+  panel.querySelector("#saveBtn").onclick = () => savePng(false);
+  panel.querySelector("#saveAllBtn").onclick = () => savePng(true);
+  panel.querySelector("#saveJsonBtn").onclick = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(LAYERS, null, 2)], { type: "application/json" }));
+    a.download = "layers.json"; a.click();
+    msg("✅ 已下载 layers.json");
+  };
+  addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") return;
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); return save(); }
+    const l = cur(); if (!l) return;
+    const fr = frameOf(l, fmt), step = e.shiftKey ? 10 : 1;
+    const m = { ArrowLeft: ["x", -step], ArrowRight: ["x", step], ArrowUp: ["y", -step], ArrowDown: ["y", step] }[e.key];
+    if (m) fr[m[0]] += m[1];
+    else if (e.key === "[") fr.rot = (fr.rot || 0) - step * 0.5;
+    else if (e.key === "]") fr.rot = (fr.rot || 0) + step * 0.5;
+    else if (e.key === "-") fr.w = Math.round(fr.w * (e.shiftKey ? 0.9 : 0.98));
+    else if (e.key === "=" || e.key === "+") fr.w = Math.round(fr.w * (e.shiftKey ? 1.1 : 1.02));
+    else if (e.key === "PageUp") l.z += 1;
+    else if (e.key === "PageDown") l.z -= 1;
+    else return;
+    e.preventDefault();
+    place(stage.querySelector(`[data-id="${l.id}"]`), l); syncInputs(); refresh(); dirty();
+  });
+  addEventListener("beforeunload", e => { if (dirtyFlag) e.preventDefault(); });
+}
+
+if (editing) mountPanel();
+build();
+Promise.all([...document.images].map(i => i.decode().catch(() => {}))).then(() => { document.body.dataset.ready = "1"; });
+</script>
+</body>
+</html>
