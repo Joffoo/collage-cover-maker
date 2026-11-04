@@ -3,7 +3,7 @@
 
 layers.json 是唯一真相源；cover.html、编辑器、PNG 都由它生成。
 
-用法（在项目目录 _inbox/<slug>_assets/ 下）：
+用法（在项目目录 00-Inbox/<slug>_assets/ 下）：
   python cover.py build
   python cover.py edit  [--port 8765]
   python cover.py render [--mockup mockup.png]
@@ -223,7 +223,7 @@ def main():
             s.add_argument("--port", type=int, default=8765)
         if n == "render":
             s.add_argument("--mockup", default="mockup.png")
-            s.add_argument("--review", action="store_true", help="是否额外生成评审板 review.png")
+            s.add_argument("--review", action=argparse.BooleanOptionalAction, default=True, help="是否生成评审板 review.png（默认开启）")
     a = p.parse_args()
     {"build": lambda a: build(os.path.abspath(a.root)), "edit": cmd_edit, "render": cmd_render}[a.cmd](a)
 

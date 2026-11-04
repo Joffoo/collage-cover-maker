@@ -70,10 +70,10 @@
 本工具链坚持“**单一真相源**”与“**离线即开即用**”的工程原则。
 
 ### 2.1 目录组织结构
-项目运行于临时工作区（如 `_inbox/<slug>_assets/`）：
+项目运行于临时工作区（如 `00-Inbox/<slug>_assets/`）：
 
 ```text
-_inbox/<slug>_assets/
+00-Inbox/<slug>_assets/
 ├── raw/                      # 原始素材归档
 │   ├── _candidates.png       # 候选人像与道具的选角拼图（带反差评分）
 │   ├── subject.jpg           # 选定的真实主体原片
@@ -231,8 +231,8 @@ python scripts/cover.py build
 # 启动本地实时交互式排版编辑器（带热回写接口）
 python scripts/cover.py edit --port 8765
 
-# 自动化工程质检、渲染四种规格成品封面（并生成并排评审板 review.png）
-python scripts/cover.py render --mockup mockup.png --review
+# 自动化工程质检、渲染四种规格成品封面（默认自动生成并排评审板 review.png）
+python scripts/cover.py render --mockup mockup.png
 ```
 
 ---
@@ -264,7 +264,7 @@ python scripts/cover.py render --mockup mockup.png --review
 
 ---
 
-## 6. 机器质检与验收标准（QA）
+## 6. 机器质检与多模态自检标准（QA）
 
 运行 `python scripts/cover.py render` 时，自动化质检引擎将实施硬性工程审查。任何一项不符合标准，流水线将直接报错中断（`FAIL`）：
 
@@ -286,6 +286,14 @@ python scripts/cover.py render --mockup mockup.png --review
     ├── 微信 (2115×900)：主副标题胶带整体及主体中心必须完全落在中央 900×900 正方保护区内
     └── 小红书 (1440×1920)：标题严禁压入顶部 80px、底部 140px 及右上角 180×180 互动避让区
 ```
+
+### Agent 视觉自检红线（Visual QA）
+机器验收全绿后，系统默认生成四画幅并排评审板 `review.png`。执行 Agent 必须通过多模态能力亲自目视审视画面，核验通过后方可交付：
+1. **画面无破损与解析异常**：无 16×16 破损图标、无缺失图层、SVG 语法无报错；
+2. **道具纯净与透底**：镂空部位（如剪刀手柄指环）无原图底色残留，道具内部无无关杂物或未抠净邮票/手指；
+3. **构图与留白平衡**：3:4 竖图必须饱满撑起垂直画幅，严禁主体缩在中间、上下大片逼仄留白；
+4. **五官视线保全**：胶带与道具绝不遮挡主体的眼神、表情与关键轮廓；
+5. **文字纯净可读**：仅保留 Dymo 打标胶带标题，1:1 缩略模式下文字与主体依然清晰完整。
 
 ---
 
@@ -358,10 +366,10 @@ Every component belongs strictly to one of two pipelines:
 The toolchain adheres to the principles of a **Single Source of Truth** and **Zero-Dependency Portability**.
 
 ### 2.1 Workspace Layout
-Generated assets reside within an isolated workspace directory (e.g., `_inbox/<slug>_assets/`):
+Generated assets reside within an isolated workspace directory (e.g., `00-Inbox/<slug>_assets/`):
 
 ```text
-_inbox/<slug>_assets/
+00-Inbox/<slug>_assets/
 ├── raw/                      # Archive of raw inputs & research
 │   ├── _candidates.png       # Casting contact sheet (with contrast metric scores)
 │   ├── subject.jpg           # Selected full-resolution photograph
@@ -520,7 +528,7 @@ python scripts/cover.py build
 python scripts/cover.py edit --port 8765
 
 # Run automated QA validation and render all production PNGs + review.png
-python scripts/cover.py render --mockup mockup.png --review
+python scripts/cover.py render --mockup mockup.png
 ```
 
 ---
@@ -551,7 +559,7 @@ When `python scripts/cover.py build` runs, all linked PNG and SVG assets are enc
 
 ---
 
-## 6. Automated Quality Assurance (QA Criteria)
+## 6. Automated Quality Assurance & Visual QA
 
 When running `python scripts/cover.py render`, the built-in QA engine executes rigid geometric, stylistic, and optical validations. Violations result in an immediate `FAIL`:
 
@@ -573,6 +581,14 @@ When running `python scripts/cover.py render`, the built-in QA engine executes r
     ├── WeChat (2115×900): Title/subtitle tape and subject center MUST be inside [607.5, 0, 900, 900]
     └── Xiaohongshu (1440×1920): Text prohibited from top 80px, bottom 140px, and top-right 180×180
 ```
+
+### Mandatory Agent Visual QA Gate
+Once machine QA passes, `review.png` is generated automatically by default. The executing Agent must inspect the rendered 4-up plate via multimodal vision before final delivery:
+1. **No Broken Graphics or Parse Failures**: No 16×16 broken image icons, no missing layers, and no malformed SVG attributes;
+2. **Clean Matting & Cutout Transparency**: Hollow regions (such as scissor finger loops) must be fully transparent, free of background velvet or unintended artifacts;
+3. **Balanced Vertical Layout**: The 3:4 portrait format must fill vertical negative space dynamically, avoiding shrunken central figures with awkward empty bands;
+4. **Facial & Eyeline Preservation**: Tapes and diagonal props must never obscure the subject's gaze, eyes, or key expressions;
+5. **Legibility & Pure Typography**: Only Dymo tape text appears; title must remain fully legible under the 1:1 thumbnail view.
 
 ---
 
