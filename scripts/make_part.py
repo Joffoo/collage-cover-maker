@@ -309,6 +309,64 @@ def cmd_fx_kawamura(a):
                    mode=a.mode, slit_relief=not a.no_slit, seed=a.seed)
 
 
+def cmd_fx_halftone(a):
+    """Convert RGBA sticker interior to rotated print halftone dots while preserving die-cut border."""
+    import math
+    from PIL import Image, ImageDraw
+
+    im = Image.open(a.input).convert("RGBA")
+    w, h = im.size
+    arr = np.array(im, dtype=np.float32)
+    rgb, alpha = arr[:, :, :3], arr[:, :, 3]
+
+    scale = 2
+    W, H = w * scale, h * scale
+    canvas = Image.new("RGB", (W, H), (247, 245, 240))
+    draw = ImageDraw.Draw(canvas)
+
+    cell = a.cell
+    angle = math.radians(a.angle)
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    corners = [(0, 0), (w, 0), (0, h), (w, h)]
+    rx = [x * cos_a + y * sin_a for x, y in corners]
+    ry = [-x * sin_a + y * cos_a for x, y in corners]
+    gx_min, gx_max = int(min(rx) / cell) - 1, int(max(rx) / cell) + 2
+    gy_min, gy_max = int(min(ry) / cell) - 1, int(max(ry) / cell) + 2
+
+    lum = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
+
+    for gy in range(gy_min, gy_max):
+        for gx in range(gx_min, gx_max):
+            u, v = gx * cell, gy * cell
+            x, y = u * cos_a - v * sin_a, u * sin_a + v * cos_a
+            ix, iy = int(round(x)), int(round(y))
+            if not (0 <= ix < w and 0 <= iy < h) or alpha[iy, ix] < 128:
+                continue
+            x0, x1 = max(0, ix - 2), min(w, ix + 3)
+            y0, y1 = max(0, iy - 2), min(h, iy + 3)
+            patch_a = alpha[y0:y1, x0:x1] > 128
+            if not np.any(patch_a):
+                continue
+            col = rgb[y0:y1, x0:x1][patch_a].mean(axis=0)
+            l_val = lum[y0:y1, x0:x1][patch_a].mean() / 255.0
+            if l_val > 0.96 and np.min(col) > 240:
+                continue
+            darkness = max(0.12, min(1.0, (1.0 - l_val) * 1.15 + 0.12))
+            r_dot = (cell * 0.54) * math.sqrt(darkness) * scale
+            cx, cy = x * scale, y * scale
+            ink = tuple(int(max(0, min(255, c * 0.92))) for c in col)
+            draw.ellipse((cx - r_dot, cy - r_dot, cx + r_dot, cy + r_dot), fill=ink)
+
+    ht_arr = np.array(canvas.resize((w, h), Image.Resampling.LANCZOS), dtype=np.uint8)
+    is_white_border = (rgb.min(axis=2) > 235) & (alpha > 128)
+    out_arr = np.zeros((h, w, 4), dtype=np.uint8)
+    out_arr[:, :, :3] = 255 - ht_arr if a.invert else ht_arr
+    out_arr[is_white_border, :3] = 255
+    out_arr[:, :, 3] = alpha.astype(np.uint8)
+    Image.fromarray(out_arr, "RGBA").save(a.out)
+    print(f"OK: {a.out} {w}x{h} (halftone cell={cell}, angle={a.angle}, invert={a.invert})")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -381,6 +439,15 @@ def main():
     kw.add_argument("--no-slit", action="store_true", help="禁用刀口切边微浮雕")
     kw.add_argument("--seed", type=int, default=42, help="随机种子（默认 42）")
     kw.set_defaults(fn=cmd_fx_kawamura)
+
+    # 5. halftone
+    ht = fx_sub.add_parser("halftone", help="印刷半调网点（抹除 AI 纹理指纹，支持负片反相）")
+    ht.add_argument("input", help="输入 RGBA 贴纸图片")
+    ht.add_argument("out", help="输出 RGBA 印刷网点贴纸图片")
+    ht.add_argument("--cell", type=float, default=6.5, help="网点网格步长像素（默认 6.5）")
+    ht.add_argument("--angle", type=float, default=28.0, help="网点旋转角度（默认 28.0）")
+    ht.add_argument("--invert", action="store_true", help="仅将主体内部反相为胶片负片，保留纯白模切边")
+    ht.set_defaults(fn=cmd_fx_halftone)
 
     a = p.parse_args()
     a.fn(a)

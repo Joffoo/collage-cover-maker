@@ -38,11 +38,11 @@ cover_*.png  成品封面
 
 ```bash
 python <scripts>/fetch_public.py search commons "George Hurrell portrait" --sheet raw/_candidates.png
-python <scripts>/fetch_public.py search cma "caliper"
+python <scripts>/fetch_public.py search openverse "<现代道具英文关键词>" --sheet raw/_prop_candidates.png
 python <scripts>/fetch_public.py get <url> raw/subject.jpg --title <标题> --license <许可> --page <来源页>
 ```
 
-只有许可为 CC0 或公有领域的才下载；`get` 会计算清晰度与反差并写入 `raw/sources.json`。检索无果时向用户要素材。
+只有许可为 CC0 或公有领域的才下载；`get` 会计算清晰度与反差并写入 `raw/sources.json`。检索无果时向用户要素材，或按第 2 步的「影棚白底实物道具」兜底生成。
 
 完成标准是方案卡里每个元件都有出身，且每个 real 元件都有原片（用户给的，或已登记 `sources.json` 的）。向用户展示方案卡与取到的候选原图并**等确认**：
 
@@ -59,9 +59,10 @@ python <scripts>/fetch_public.py get <url> raw/subject.jpg --title <标题> --li
   仅当需要现实中不存在的超现实波普道具时触发，执行双垫图标准工作流：
   1. **垫人像出整图**：将真实选角原片（`raw/subject.jpg`）作为参考图垫给生图模型，输入 `prompts.md` 的创意效果图提示词，生成具备全局俯仰透视与空间动势的艺术草图 `mockup.png`；
   2. **垫整图出白底零件**：将 `mockup.png` 垫图输入生图工具，提示词明确声明『**排除人物，仅提取周围平涂道具与涂鸦**』，生成纯白底平铺母版 `sheet.png`。
-- **路径 B · 零生图流（纯公版实物摄影与算法合成 · 零生图消耗）**：
-  当道具在现实中存在实体时触发，全流程生图调用为 0：
-  - **公版实体道具**：直接通过 `fetch_public.py` 检索 CC0 博物馆高精实物摄影（如游标卡尺、古典活塞短号）；
+- **路径 B · 零生图流（纯公版实拍与算法合成 · 零生图消耗）**：
+  当道具在现实中存在实体且公版库能找到**现代高辨识度干净实拍**时触发：
+  - **公版实体道具**：优先用 `fetch_public.py search openverse "<英文关键词>"`（已默认锁定 `category=photograph`，可命中 Rawpixel/StockSnap/Flickr 现代 CC0 实拍）或 `commons "<英文关键词> -18th -19th -engraving -drawing -patent"` 检索现代实拍摄影（**严禁用 CMA/AIC 的冷门古董异形件充当现代道具**，且必须满足 `style.md` 的「1 秒辨识度」与「镂空避撞」门禁）；
+  - **影棚白底生图兜底（real-fallback，仅最后手段）**：若 Openverse/Commons 确实搜不到干净现代实拍，优先向用户要图；确需兜底生图时按 `prompts.md`「影棚白底实物道具」生成 `raw/prop.png`，走 `make_part.py real` 后再叠加 `fx halftone` 抹除 AI 平滑指纹；
   - **算法无模型合成**：运行 `python <scripts>/make_part.py synth parts --seed <随机整数>`，现场合成高精细干刷丙烯与马克笔涂鸦，零配额消耗，彻底杜绝 AI 指纹。
 
 完成标准是得到纯白底零件图 `sheet.png`（路径 A）或公版原片/算法合成文件（路径 B）。
@@ -102,6 +103,10 @@ python <scripts>/make_part.py gen parts/p03.png parts/prop.svg
    ```bash
    python <scripts>/make_part.py fx kawamura parts/subject.png parts/subject_kawamura.png --strips 70 --amplitude 50 --stagger 16
    ```
+5. **印刷半调网点**（Halftone Print Dots）：将人物或物件贴纸的内部像素转换为 28° 旋转彩色印刷网点（Ben-Day Dots），用于抹除 AIGC 生成图的平滑像素指纹并强化波普画报印刷质感；保留 `14px` 纯白模切外缘与透明通道。加 `--invert` 可仅将主体内部反相为胶片负片（用于正/负双生对照封面）。
+   ```bash
+   python <scripts>/make_part.py fx halftone parts/subject_clean.png parts/subject.png --cell 6.5 --angle 28 [--invert]
+   ```
 
 完成标准是每个 real 元件是带透明通道的 PNG，每个 gen 元件是 SVG，fx 处理后的产物严格维持透明通道或纯净矢量，并且逐个打开看过边缘干净、无背景残留。抠不净就换模型或回到原片裁切后重抠；SVG 色块糟糕就换元件图重出该元件。
 
@@ -131,7 +136,12 @@ python <scripts>/cover.py render
 
 ## 交付
 
-列出 `cover_2115x900.png`、`cover_900x900.png`、`cover_1920x1080.png`、`cover_1440x1920.png` 与 `cover.html`（`python <scripts>/cover.py edit` 随时回到编辑器），并附 `raw/sources.json` 里的公版素材出处。
+列出 `cover_2115x900.png`、`cover_900x900.png`、`cover_1920x1080.png`、`cover_1440x1920.png` 与 `cover.html`（`python <scripts>/cover.py edit` 随时回到编辑器），并附 `raw/sources.json` 里的公版素材出处。各尺寸默认用途：
+
+- `cover_1920x1080.png`（16:9）：Obsidian 笔记题图、Hexo 博客文章封面
+- `cover_2115x900.png`（2.35:1）：仅用于微信公众号头条封面/正文首图
+- `cover_900x900.png`（1:1）：公众号次条/正方形卡片封面
+- `cover_1440x1920.png`（3:4）：小红书图文封面
 
 ## 复修
 

@@ -2,9 +2,10 @@
 """公版素材与选角引擎：检索 CC0/公有领域图片，支持候选拼图浏览，下载并计算清晰度/微反差客观指标。
 
 用法：
-  python fetch_public.py search cma     <关键词> [--type Photograph] [--limit 8] [--sheet raw/_candidates.png]
-  python fetch_public.py search aic     <关键词> [--limit 8] [--sheet raw/_candidates.png]
-  python fetch_public.py search commons <关键词> [--limit 8] [--sheet raw/_candidates.png]
+  python fetch_public.py search openverse <关键词> [--limit 8] [--sheet raw/_candidates.png]
+  python fetch_public.py search commons   <关键词> [--limit 8] [--sheet raw/_candidates.png]
+  python fetch_public.py search cma       <关键词> [--type Photograph] [--limit 8] [--sheet raw/_candidates.png]
+  python fetch_public.py search aic       <关键词> [--limit 8] [--sheet raw/_candidates.png]
   python fetch_public.py get <图片URL> <输出文件> --title <标题> --license <许可> --page <来源页>
 
 自动读取系统代理或常见本地端口（127.0.0.1:12000 / 7890）。
@@ -21,7 +22,7 @@ import numpy as np
 import requests
 
 UA = {"User-Agent": "collage-cover-maker/2.0 (public-domain editorial casting)"}
-OK_LICENSE = ("cc0", "public domain", "pd", "pdm", "no known copyright")
+OK_LICENSE = ("cc0", "public domain", "pd", "pdm", "no known copyright", "no restrictions")
 
 
 def get_session():
@@ -153,11 +154,41 @@ def build_contact_sheet(rows, sheet_path):
     print(f"候选选角拼图 -> {sheet_path}（打开目视挑选张力最强的一张）")
 
 
+def search_openverse(q, limit):
+    r = SESSION.get("https://api.openverse.org/v1/images/", params={
+        "q": q,
+        "license": "cc0,pdm",
+        "category": "photograph",
+        "page_size": limit,
+    }, timeout=30)
+    r.raise_for_status()
+    out = []
+    for d in r.json().get("results", []):
+        url = d.get("url")
+        if not url:
+            continue
+        w, h = d.get("width") or "?", d.get("height") or "?"
+        lic = (d.get("license") or "cc0").upper()
+        out.append({
+            "source": "Openverse",
+            "title": d.get("title") or "Untitled",
+            "type": d.get("category") or "Photograph",
+            "license": lic,
+            "url": url,
+            "thumb": d.get("thumbnail") or url,
+            "size": f"{w}x{h}",
+            "page": d.get("foreign_landing_url") or url,
+        })
+    return out
+
+
 def cmd_search(a):
     if a.site == "cma":
         rows = search_cma(a.query, a.limit, a.type)
     elif a.site == "aic":
         rows = search_aic(a.query, a.limit)
+    elif a.site == "openverse":
+        rows = search_openverse(a.query, a.limit)
     else:
         rows = search_commons(a.query, a.limit)
     for i, r in enumerate(rows, 1):
@@ -205,7 +236,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("search")
-    s.add_argument("site", choices=["cma", "aic", "commons"])
+    s.add_argument("site", choices=["cma", "aic", "commons", "openverse"])
     s.add_argument("query")
     s.add_argument("--type", default=None, help="CMA 类型过滤，如 Photograph")
     s.add_argument("--limit", type=int, default=8)

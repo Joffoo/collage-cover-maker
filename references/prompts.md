@@ -27,3 +27,11 @@ Based on the reference image, deconstruct the collage into an exploded flat layo
 3. [仅当道具是扁平图形时] the oversized [隐喻道具].
 Flat solid colors, limited palette, crisp edges, no gradients, no texture, no photographic detail. Keep every element's shape, color and proportion identical to the reference. No shadows on the white ground, no text.
 ```
+
+## 影棚白底实物道具（real-fallback）
+
+当公版库（`openverse` / `commons`）搜不到干净、高辨识度的现代实物原片时，用本提示词生成孤立的影棚摄影实物，随后走 `make_part.py real` 抠图并烘焙 14px 纯白模切边。严禁去博物馆库硬凑古董怪件。
+
+```text
+A single isolated studio product photograph on a seamless pure white background (#FFFFFF): [现代常见实物的精确描述，如 a vintage analog needle pressure gauge with brushed steel bezel and bright red needle]. Hard directional studio lighting, sculptural contrast, photorealistic, crisp edges, centered with generous white margin around it, no drop shadow on the white ground, no extra objects, no brand logo or watermark.
+```
